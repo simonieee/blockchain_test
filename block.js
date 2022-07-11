@@ -78,7 +78,6 @@ Blockchain.prototype.getLastBlockHash = function () {
 // 이전블록 해시값 조회
 Blockchain.prototype.getPrevHash = function (blockID) {
   const [block] = this.chain.filter((item) => item.blockID == blockID);
-  console.log(block);
   if (block !== "undefined") {
     return block.prevBlockHash;
   }
