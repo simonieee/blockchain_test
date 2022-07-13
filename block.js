@@ -1,23 +1,30 @@
 const { sha3_256 } = require("js-sha3");
-
-const bufferID = Buffer.alloc(160);
-
-const genesis = {
-  blockID: 0x0,
-  prevBlockHash: "0x00000000000000000000",
-  blockData: ["Genesis Block"],
-};
+const { MerkleTree } = require("merkletreejs");
 
 function Blockchain() {
-  this.chain = [genesis];
+  this.chain = [];
   this.pendingTx = [];
 }
+
+// 제네시스 블록 생성
+Blockchain.prototype.createGenesis = function () {
+  const blockData = ["genesis block"];
+  const genesis = {
+    blockID: 0x0,
+    prevBlockHash: "0x00000000000000000000",
+    merkleRoot: this.createMerkleTree(blockData),
+    blockData: blockData,
+  };
+
+  this.chain.push(genesis);
+};
 
 // 블록 생성
 Blockchain.prototype.createNewBlock = function () {
   const newBlock = {
     blockID: this.chain.length,
     prevBlockHash: this.getLastBlockHash(),
+    merkleRoot: this.createMerkleTree(this.pendingTx),
     blockData: this.pendingTx,
   };
 
@@ -70,7 +77,8 @@ Blockchain.prototype.getLastBlockHash = function () {
   const strData =
     prevBlock.blockID.toString() +
     JSON.stringify(prevBlock.blockData) +
-    prevBlock.prevBlockHash;
+    prevBlock.prevBlockHash +
+    prevBlock.merkleRoot;
   const hash = sha3_256(strData).slice(44, 64);
   return hash;
 };
@@ -87,7 +95,10 @@ Blockchain.prototype.getPrevHash = function (blockID) {
 Blockchain.prototype.blockHash = function (blockID) {
   const [block] = this.chain.filter((item) => item.blockID === blockID);
   const strData =
-    block.blockID + JSON.stringify(block.blockData) + block.prevBlockHash;
+    block.blockID +
+    JSON.stringify(block.blockData) +
+    block.prevBlockHash +
+    block.merkleRoot;
   const hash = sha3_256(strData).slice(44, 64);
   return hash;
 };
@@ -95,17 +106,181 @@ Blockchain.prototype.blockHash = function (blockID) {
 // 블럭 검증
 Blockchain.prototype.isVaildBlock = function () {
   const block = this.chain;
-  block.map((b) => {
-    // 마지막 블럭 전까지 실행.... 마지막 블록이 변조되면 어쩌지???
+  for (const b of block) {
     if (this.getLastBlock()["blockID"] !== b.blockID) {
       const hash = this.blockHash(b.blockID); // 현재 블록 해시
       const prevHash = this.getPrevHash(b.blockID + 1); // 다음 블록이 가지고 있는 이전 블록 해시
+      const merkleRoot = this.createMerkleTree(b.blockData);
       if (hash !== prevHash) {
-        console.log(b.blockID, "번째 블록 hash 값:", hash);
-        console.log(b.blockID + 1, "번째 블록 prevHash 값:", prevHash);
-        console.log(b.blockID, "번째 블록이 위변조 되었습니다.");
-        return b.blockID;
+        console.log(
+          `---------------------------------------------${b.blockID}번 블록 검증---------------------------------------------`
+        );
+        console.log(
+          b.blockID,
+          "번째 블록 hash 값:",
+          "\x1b[31m",
+          hash,
+          "\x1b[0m"
+        );
+        console.log(
+          b.blockID + 1,
+          "번째 블록 prevHash 값:",
+          "\x1b[31m",
+          prevHash,
+          "\x1b[0m"
+        );
+        console.log(
+          b.blockID,
+          "번째 블록 MerkleRoot: ",
+          "\x1b[31m",
+          b.merkleRoot,
+          "\x1b[0m"
+        );
+        console.log(
+          b.blockID,
+          "번째 블록 수정 후 MerkleRoot: ",
+          "\x1b[31m",
+          merkleRoot,
+          "\x1b[0m"
+        );
+        console.log(
+          b.blockID,
+          "\x1b[31m",
+          "번째 블록이 위변조 되었습니다.",
+          "\x1b[0m"
+        );
+        console.log(
+          "-------------------------------------------------------------------------------------------------------"
+        );
       }
+    }
+  }
+};
+
+Blockchain.prototype.isVaildBlock2 = function () {
+  const block = this.chain;
+  block.map((b) => {
+    if (this.getLastBlock()["blockID"] !== b.blockID) {
+      const hash = this.blockHash(b.blockID); // 현재 블록 해시
+      const prevHash = this.getPrevHash(b.blockID + 1); // 다음 블록이 가지고 있는 이전 블록 해시\
+      const merkleRoot = this.createMerkleTree(b.blockData);
+      if (hash !== prevHash) {
+        console.log(
+          `---------------------------------------------${b.blockID}번 블록 검증---------------------------------------------`
+        );
+        console.log(
+          b.blockID,
+          "번째 블록 hash 값:",
+          "\x1b[31m",
+          hash,
+          "\x1b[0m"
+        );
+        console.log(
+          b.blockID + 1,
+          "번째 블록 prevHash 값:",
+          "\x1b[31m",
+          prevHash,
+          "\x1b[0m"
+        );
+        console.log(
+          b.blockID,
+          "번째 블록 MerkleRoot: ",
+          "\x1b[31m",
+          b.merkleRoot,
+          "\x1b[0m"
+        );
+        console.log(
+          b.blockID,
+          "번째 블록 수정 후 MerkleRoot: ",
+          "\x1b[31m",
+          merkleRoot,
+          "\x1b[0m"
+        );
+        console.log(
+          b.blockID,
+          "\x1b[31m",
+          "번째 블록이 위변조 되었습니다.",
+          "\x1b[0m"
+        );
+        console.log(
+          "-------------------------------------------------------------------------------------------------------"
+        );
+      }
+    }
+  });
+};
+
+// 머클루트 생성
+Blockchain.prototype.createMerkleTree = function (blockData) {
+  const merkleTree = new MerkleTree(blockData, sha3_256);
+  const merkleRoot = merkleTree.getRoot().toString("hex");
+  return merkleRoot;
+};
+
+// merkletreejs 사용 검증
+Blockchain.prototype.merkleVaild = function () {
+  const block = this.chain;
+  block.map((b) => {
+    const merkleTree = new MerkleTree(b.blockData, sha3_256);
+    const newMerkleRoot = merkleTree.getRoot().toString("hex");
+    const oldMerkleRoot = b.merkleRoot;
+    // let verify = true;
+    // b.blockData.forEach((blockData) => {
+    //   const leaf = blockData;
+    //   const proof = merkleTree.getProof(leaf);
+    //   const result = merkleTree.verify(proof, leaf, oldMerkleRoot);
+    //   if (result === false) {
+    //     verify = false;
+    //   }
+    // });
+    let verify = b.blockData.some((x) => {
+      const leaf = x;
+      const proof = merkleTree.getProof(leaf);
+      const result = merkleTree.verify(proof, leaf, oldMerkleRoot);
+      return result === true;
+    });
+
+    if (verify === false) {
+      console.log(
+        `---------------------------------------------${b.blockID}번 블록 검증---------------------------------------------`
+      );
+      console.log("수정 후 머클루트: ", "\x1b[31m", newMerkleRoot, "\x1b[0m");
+      console.log("수정 전 머클루트: ", "\x1b[31m", oldMerkleRoot, "\x1b[0m");
+      console.log(
+        b.blockID,
+        "\x1b[31m",
+        "번째 블록이 위변조 되었습니다.",
+        "\x1b[0m"
+      );
+      console.log(
+        "-------------------------------------------------------------------------------------------------------"
+      );
+    }
+  });
+};
+
+// 머클트리 단순 검증
+Blockchain.prototype.merkleVaild2 = function () {
+  const block = this.chain;
+  block.map((b) => {
+    const merkleTree = new MerkleTree(b.blockData, sha3_256);
+    const newMerkleRoot = merkleTree.getRoot().toString("hex");
+    const oldMerkleRoot = b.merkleRoot;
+    if (newMerkleRoot !== oldMerkleRoot) {
+      console.log(
+        `---------------------------------------------${b.blockID}번 블록 검증---------------------------------------------`
+      );
+      console.log("수정 후 머클루트: ", "\x1b[31m", newMerkleRoot, "\x1b[0m");
+      console.log("수정 전 머클루트: ", "\x1b[31m", oldMerkleRoot, "\x1b[0m");
+      console.log(
+        b.blockID,
+        "\x1b[31m",
+        "번째 블록이 위변조 되었습니다.",
+        "\x1b[0m"
+      );
+      console.log(
+        "-------------------------------------------------------------------------------------------------------"
+      );
     }
   });
 };
